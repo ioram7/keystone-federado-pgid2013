@@ -102,7 +102,8 @@ class FederatedAuthentication(wsgi.Middleware):
         
     @webob.dec.wsgify(RequestClass=Request)
     def process_request(self,request):
-        
+
+#	print request        
         
         LOG.debug('Request intercepted by CVM')
         LOG.debug('--------------------------')
@@ -114,6 +115,7 @@ class FederatedAuthentication(wsgi.Middleware):
         data = jsonutils.loads(body)
        
         if 'idpResponse' in data:
+	    print "idpResponse"
             username, expires, validatedUserAttributes = self.validate(data, data['realm'])		
             identity_api = identity.controllers.UserV3()
             user_manager = user_management.UserManager()
@@ -127,14 +129,17 @@ class FederatedAuthentication(wsgi.Middleware):
             LOG.debug(resp)
             return valid_Response(resp)
         elif 'auth' in data:
+	    print "auth"
             LOG.debug("We just want to check the token and domain and forward the request")
             self.setUserDomain(data)
             LOG.debug("We set the user data")
             request.body = jsonutils.dumps(data)
             return 
         elif 'idpNegotiation' in data:
+	    print "idpNegotiation"
 	    return self.negotiate(data)
         else:
+	    print "getRequest"
             if 'realm' in data:
                 realm_id = data['realm']
                 return self.getRequest(realm_id)
@@ -142,26 +147,26 @@ class FederatedAuthentication(wsgi.Middleware):
             return directory.getProviderList()
 
     def getRequest(self, realm):
+#	print "getRequest: Start"
         ''' Get an authentication request to return to the client '''
         catalog_api = catalog.controllers.ServiceV3()
         endpoint_api = catalog.controllers.EndpointV3()
         context = {'is_admin': True}
         service = catalog_api.get_service(context=context, service_id=realm['id'])['service']
         protocol = service['type'].split('.')[1]
+#	print "getRequest: protocol = ", protocol
         processing_module = load_protocol_module(protocol)
+#	print "getRequest: ProcessingModule loaded"
         context['query_string'] = {}
         context['path'] = ""
         context['query_string']['service_id'] = service['id']
         endpoints = endpoint_api.list_endpoints(context)['endpoints']
-        endpoint = None
-        if not len(endpoints) < 1:
-            for e in endpoints:
-                if e['interface'] == 'public':
-                    endpoint = e['url']
-        else:
+        if len(endpoints) < 1:
             LOG.error('No endpoint found for this service')
+#	print "getRequest: ris start"
         ris = processing_module.RequestIssuingService()
-        return ris.getIdPRequest(CONF.federated.requestSigningKey, CONF.federated.SPName, endpoint)
+#	print "getRequest: ris end", ris
+        return ris.getIdPRequest(CONF.federated.requestSigningKey, CONF.federated.SPName, endpoints)
 
     def validate(self, data, realm):
         ''' Get the validated attributes '''

@@ -197,12 +197,11 @@ class CredentialValidator(object):
 		print resp
 		#hardcoded - MUDAR
 		name = resp['username'] 
-
-#	        for att, value in resp:
-#            		atts[att] = value
-#			print att, value
-#		
-#		issuers = self.check_issuers(data, atts, realm_id)
+	        for att, value in resp:
+            		atts[att] = value
+			print att, value
+		
+		issuers = self.check_issuers(data, atts, realm_id)
 
 	print "name   : ",name
 	print "expire : ",expire

@@ -107,7 +107,15 @@ class RequestIssuingService(object):
 </Signature>
         </samlp:AuthnRequest>"""
 
-    def getIdPRequest(self,key, issuer, endpoint):
+    def getIdPRequest(self,key, issuer, endpoints):
+        endpoint = None
+        if not len(endpoints) < 1:
+            for e in endpoints:
+                if e['interface'] == 'public':
+                    endpoint = e['url']
+#		print (e)
+        else:
+            LOG.error('No endpoint found for this service')
         resp = {}
         resp['idpRequest'] = '?'+self.create_IdpRequest(key, issuer)
         resp['idpEndpoint'] = endpoint
@@ -226,6 +234,9 @@ class CredentialValidator(object):
 	    atts[att.get("Name")] = ats
 	if unique_attribute is not None and atts.get(unique_attribute, None) is not None:
             names = atts.get(unique_attribute)
+	print "name   : ", names[0]
+	print "expires: ", expires
+	print "issuers: ", self.check_issuers(data, atts, realm_id) 
         return names[0], expires, self.check_issuers(data, atts, realm_id)
 
     def check_issuers(self, data, atts, realm_id):
