@@ -115,7 +115,7 @@ class FederatedAuthentication(wsgi.Middleware):
         data = jsonutils.loads(body)
        
         if 'idpResponse' in data:
-	    print "idpResponse"
+#	    print "idpResponse"
             username, expires, validatedUserAttributes = self.validate(data, data['realm'])		
             identity_api = identity.controllers.UserV3()
             user_manager = user_management.UserManager()
@@ -129,17 +129,17 @@ class FederatedAuthentication(wsgi.Middleware):
             LOG.debug(resp)
             return valid_Response(resp)
         elif 'auth' in data:
-	    print "auth"
+#	    print "auth"
             LOG.debug("We just want to check the token and domain and forward the request")
             self.setUserDomain(data)
             LOG.debug("We set the user data")
             request.body = jsonutils.dumps(data)
             return 
         elif 'idpNegotiation' in data:
-	    print "idpNegotiation"
+#	    print "idpNegotiation"
 	    return self.negotiate(data)
         else:
-	    print "getRequest"
+#	    print "getRequest"
             if 'realm' in data:
                 realm_id = data['realm']
                 return self.getRequest(realm_id)

@@ -178,35 +178,53 @@ class CredentialValidator(object):
 	#Ioram
 #	print (data)
 #	print (realm_id)
-        print ("oath: ", oauthSrv)
-        print ("ruri: ", redirecturi)
-	print ("code: ", data["code"])
+
+#       print ("oath: ", oauthSrv)
+#       print ("ruri: ", redirecturi)
+#	print ("code: ", data["code"])
 
 	name = "error"
 	#hardcoded - MUDAR
 	expire = "2014-06-01T00:00:00z" 
 	resp = {}
 	issuers = {}
-	atts = []
+	atts = {}
 
 	if oauthSrv is None or redirecturi is None or idservice is None:
 		print "No oauthSrv or no redirecturi or no idservice"
 	else :
 	        session = oauthSrv.get_auth_session(data = {'code': data["code"], 'redirect_uri': redirecturi})
 		resp = session.get(idservice).json()
-		print resp
+#		print resp
 		#hardcoded - MUDAR
-		name = resp['username'] 
+		name = resp['username']
 
-#	        for att, value in resp:
-#            		atts[att] = value
+	        for att, value in resp.iteritems():
 #			print att, value
-#		
-#		issuers = self.check_issuers(data, atts, realm_id)
+			if isinstance(value, list):
+				try :
+					atts[att] += value
+				except :
+					atts[att] = value
 
-	print "name   : ",name
-	print "expire : ",expire
-	print "issuers: ",issuers
+			elif isinstance(value, unicode) :
+				try : 
+					atts[att].append(value)
+				except :
+					atts[att] = [value]
+			else :
+				v = unicode(value)
+				try : 
+					atts[att].append(v)
+				except :
+					atts[att] = [v]
+#		print atts
+
+		issuers = self.check_issuers(data, atts, realm_id)
+
+#	print "name   : ",name
+#	print "expire : ",expire
+#	print "issuers: ",issuers
 
 #######
 #name   :  _3409b1498beb31e0194afe984c61fda80de968c6e7
@@ -217,14 +235,26 @@ class CredentialValidator(object):
         return name, expire, issuers 
 
     def check_issuers(self, data, atts, realm_id):
+	print ("check_issuers")
         context = {"is_admin": True}
         valid_atts = {}
+	i = 1
         for att in atts:
+#	   print("Att: "+att)
            for val in atts[att]:
+#	       uv = unicode(val)
+#	       print("Val: "+uv)
                org_atts = self.org_mapping_api.list_org_attributes(context)['org_attributes']
                for org_att in org_atts:
+#		   print ("OrgType: "+org_att['type'])
+#		   if org_att['value'] is not None : 
+#			   print ("OrgVal : "+org_att['value'])
+#		   else :
+#			   print ("OrgVal : None")
                    if org_att['type'] == att:
+#		       print("OrgType == att")
                        if org_att['value'] == val or org_att['value'] is None:
+#			   print("OrgVal == val, or none")
                            try:
                                self.org_mapping_api.check_attribute_can_be_issued(context, service_id=realm_id, org_attribute_id=org_att['id'])
                                try:
