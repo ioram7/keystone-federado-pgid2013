@@ -67,6 +67,7 @@ import webob.exc
 
 from rauth.service import OAuth2Service
 import re
+from datetime import timedelta, datetime
 
 from keystone.contrib import mapping
 from keystone import catalog
@@ -186,10 +187,12 @@ class CredentialValidator(object):
 
 	name = "error"
 	#hardcoded - MUDAR
-	expire = "2014-06-01T00:00:00z" 
+	expire = "2100-01-01T00:00:00z" 
 	resp = {}
 	issuers = {}
 	atts = {}
+	nw = datetime.now()
+	print nw
 
 	if oauthSrv is None or redirecturi is None or idservice is None:
 		print "No oauthSrv or no redirecturi or no idservice"
@@ -207,13 +210,25 @@ class CredentialValidator(object):
 
                 for r in rsp.split('&') :
                        part = r.partition('=')
+#                      print part[0] + " : " + part[2]
+
                        if part[0] == 'access_token' :
                                 access_token = part[2]
 #				print access_token
                        elif (part[0] == 'expires') or (part[0] == 'expires_in') :
                                 exp = part[2]
-#			        print exp
-#                       print part[0] + " : " + part[2]
+				exp = int(exp)
+				exp = timedelta(0,exp,0)
+				exp = nw + exp
+				exp = str(exp)
+#				print exp
+				exps = exp.partition(' ')
+				time = exps[2].partition('.')
+				expire = exps[0]+'T'+time[0]+'z'
+#				print exp
+
+				#2013-09-07 14:05:33.767074
+#	               expire = "2014-06-01T00:00:00z" 
 
 #	        session = oauthSrv.get_auth_session(data = {'code': data["code"], 'redirect_uri': redirecturi})
 		session = oauthSrv.get_session(access_token)
