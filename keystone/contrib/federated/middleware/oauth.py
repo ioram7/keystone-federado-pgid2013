@@ -133,7 +133,7 @@ class RequestIssuingService(object):
 #	print ("oath: ", oauthSrv)
 
 	state = ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for x in range(12))
-	print state
+#	print state
 
 	params = {'scope': scope,
           'response_type': 'code',
