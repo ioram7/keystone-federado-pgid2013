@@ -194,7 +194,29 @@ class CredentialValidator(object):
 	if oauthSrv is None or redirecturi is None or idservice is None:
 		print "No oauthSrv or no redirecturi or no idservice"
 	else :
-	        session = oauthSrv.get_auth_session(data = {'code': data["code"], 'redirect_uri': redirecturi})
+                prms = {
+                    'code': data["code"],
+                    'grant_type': 'authorization_code',
+                    'redirect_uri': redirecturi,
+                }
+#                print prms
+
+                at_resp = oauthSrv.get_raw_access_token(data=prms)
+                rsp = at_resp.content
+#                print rsp
+
+                for r in rsp.split('&') :
+                       part = r.partition('=')
+                       if part[0] == 'access_token' :
+                                access_token = part[2]
+#				print access_token
+                       elif (part[0] == 'expires') or (part[0] == 'expires_in') :
+                                exp = part[2]
+#			        print exp
+#                       print part[0] + " : " + part[2]
+
+#	        session = oauthSrv.get_auth_session(data = {'code': data["code"], 'redirect_uri': redirecturi})
+		session = oauthSrv.get_session(access_token)
 		resp = session.get(idservice).json()
 #		print resp
 		#hardcoded - MUDAR
@@ -236,7 +258,7 @@ class CredentialValidator(object):
         return name, expire, issuers 
 
     def check_issuers(self, data, atts, realm_id):
-	print ("check_issuers")
+#	print ("check_issuers")
         context = {"is_admin": True}
         valid_atts = {}
 	i = 1
