@@ -173,6 +173,7 @@ keystone/contrib/federated/middleware/__init__.py
 keystone/contrib/federated/middleware/core.py
 keystone/contrib/federated/middleware/keystonev2.py
 keystone/contrib/federated/middleware/oauth.py
+keystone/contrib/federated/middleware/oauth_bkp.py
 keystone/contrib/federated/middleware/saml.py
 keystone/contrib/federated/middleware/user_management.py
 keystone/contrib/federated/middleware/directory/__init__.py

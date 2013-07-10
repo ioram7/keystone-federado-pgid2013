@@ -67,6 +67,7 @@ import webob.exc
 
 from rauth.service import OAuth2Service
 import re
+#from datetime import timedelta, datetime
 
 from keystone.contrib import mapping
 from keystone import catalog
@@ -128,8 +129,8 @@ class RequestIssuingService(object):
 #	print ("oath: ", oauthSrv)
 
 	params = {'scope': scope,
-          'response_type': 'code',
-          'state' : 'abcdefgh',
+          'response_type': 'code', # always code here
+          'state' : 'abcdefgh', # Random string
           'redirect_uri': redirecturi }
 
 	authorize_url = oauthSrv.get_authorize_url(**params)
@@ -194,9 +195,40 @@ class CredentialValidator(object):
 	if oauthSrv is None or redirecturi is None or idservice is None:
 		print "No oauthSrv or no redirecturi or no idservice"
 	else :
+		print "Aqui"
+#		prms = {
+#		    'code': data["code"],
+#		    'grant_type': 'authorization_code',
+#		    'redirect_uri': redirecturi,
+#		}
+#		print prms
+
+#		at_resp = oauthSrv.get_raw_access_token(data=prms)
+#		rsp = at_resp.content
+#		print rsp
+
+		#access_token=CAAIhvCYW8W0BAJ75zTWxXYZCZAjZBlHHK0MJQQoV9s4ZC9vb8rbRjvP9PZCyXMZBdWbGzt4qNcPVKChJZAexFLrjFwhG1r2grj01lzsbnUSvZCMVQwhKZA0eIpvTwa075Q6Pb2v5ZAgS7ffhAeFsEygTnJcWH5CsPNp44ZD&expires=5157384
+
+#		access_token = ''
+#		exp = ''
+
+#		now = datetime.now()
+#		print now
+
+#		for r in rsp.split('&') :
+#			part = r.partition('=')
+#			if part[0] == 'access_token' :
+#				access_token = part[2]
+#			elif (part[0] == 'expire') or (part[0] == 'expires_in') :
+#				exp = part[2]
+#				expi = int(part[2])
+#				exp = now + timedelta(0,expi,0)
+#			print part[0] + " : " + part[2]
+
 	        session = oauthSrv.get_auth_session(data = {'code': data["code"], 'redirect_uri': redirecturi})
+#		session = oauthSrv.get_session(access_token)
 		resp = session.get(idservice).json()
-#		print resp
+		print resp
 		#hardcoded - MUDAR
 		name = resp['username']
 
@@ -221,11 +253,12 @@ class CredentialValidator(object):
 					atts[att] = [v]
 #		print atts
 
+	print "name   : ",name
+	print "expire : ",expire
+
 		issuers = self.check_issuers(data, atts, realm_id)
 
-#	print "name   : ",name
-#	print "expire : ",expire
-#	print "issuers: ",issuers
+	print "issuers: ",issuers
 
 #######
 #name   :  _3409b1498beb31e0194afe984c61fda80de968c6e7
@@ -236,7 +269,7 @@ class CredentialValidator(object):
         return name, expire, issuers 
 
     def check_issuers(self, data, atts, realm_id):
-	print ("check_issuers")
+#	print ("check_issuers")
         context = {"is_admin": True}
         valid_atts = {}
 	i = 1

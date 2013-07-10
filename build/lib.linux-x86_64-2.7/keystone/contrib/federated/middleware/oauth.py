@@ -104,6 +104,7 @@ class RequestIssuingService(object):
 	clientid = endpoints[0].get("client_id",None)
 	clientsec = endpoints[0].get("client_secret",None)
         idservice = endpoints[0].get("id_service",None)
+	scope = endpoints[0].get("scope",None)
 
 	ruritmp = endpoints[0].get("redirect_uri",None)
 	if len(ruritmp) > 1 and ruritmp[-1] == '/' :
@@ -126,7 +127,7 @@ class RequestIssuingService(object):
 
 #	print ("oath: ", oauthSrv)
 
-	params = {'scope': 'email',
+	params = {'scope': scope,
           'response_type': 'code',
           'state' : 'abcdefgh',
           'redirect_uri': redirecturi }
