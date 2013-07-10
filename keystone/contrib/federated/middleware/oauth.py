@@ -68,6 +68,8 @@ import webob.exc
 from rauth.service import OAuth2Service
 import re
 from datetime import timedelta, datetime
+import string
+import random
 
 from keystone.contrib import mapping
 from keystone import catalog
@@ -76,6 +78,7 @@ LOG = logging.getLogger(__name__)
 global oauthSrv
 global redirecturi
 global idservice
+global state
 
 class RequestIssuingService(object):
     def __init__(self):
@@ -86,6 +89,7 @@ class RequestIssuingService(object):
 	global oauthSrv
 	global redirecturi
 	global idservice
+	global state
 
         endpoint_pub = None
         endpoint_int = None
@@ -128,9 +132,12 @@ class RequestIssuingService(object):
 
 #	print ("oath: ", oauthSrv)
 
+	state = ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for x in range(12))
+	print state
+
 	params = {'scope': scope,
           'response_type': 'code',
-          'state' : 'abcdefgh',
+          'state' : state,
           'redirect_uri': redirecturi }
 
 	authorize_url = oauthSrv.get_authorize_url(**params)
@@ -184,6 +191,7 @@ class CredentialValidator(object):
 #       print ("oath: ", oauthSrv)
 #       print ("ruri: ", redirecturi)
 #	print ("code: ", data["code"])
+#	print ("code: ", data["state"])
 
 	name = "error"
 	#hardcoded - MUDAR
@@ -192,7 +200,12 @@ class CredentialValidator(object):
 	issuers = {}
 	atts = {}
 	nw = datetime.now()
-	print nw
+#	print nw
+
+	# exit if state don't match (no attributes will be returned)
+	if state != data["state"] :
+		print "State doesn't match."
+	        return name, expire, issuers 
 
 	if oauthSrv is None or redirecturi is None or idservice is None:
 		print "No oauthSrv or no redirecturi or no idservice"
