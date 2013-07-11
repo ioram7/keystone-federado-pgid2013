@@ -79,6 +79,7 @@ global oauthSrv
 global redirecturi
 global idservice
 global state
+global name_field
 
 class RequestIssuingService(object):
     def __init__(self):
@@ -90,6 +91,7 @@ class RequestIssuingService(object):
 	global redirecturi
 	global idservice
 	global state
+	global name_field
 
         endpoint_pub = None
         endpoint_int = None
@@ -110,6 +112,7 @@ class RequestIssuingService(object):
 	clientsec = endpoints[0].get("client_secret",None)
         idservice = endpoints[0].get("id_service",None)
 	scope = endpoints[0].get("scope",None)
+	name_field = endpoints[0].get("name_field",None)
 
 	ruritmp = endpoints[0].get("redirect_uri",None)
 	if len(ruritmp) > 1 and ruritmp[-1] == '/' :
@@ -133,7 +136,7 @@ class RequestIssuingService(object):
 #	print ("oath: ", oauthSrv)
 
 	state = ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for x in range(12))
-	print state
+#	print state
 
 	params = {'scope': scope,
           'response_type': 'code',
@@ -215,40 +218,50 @@ class CredentialValidator(object):
                     'grant_type': 'authorization_code',
                     'redirect_uri': redirecturi,
                 }
-#                print prms
+                #print prms
 
                 at_resp = oauthSrv.get_raw_access_token(data=prms)
                 rsp = at_resp.content
-#                print rsp
+#		print rsp
+		try :
+			rsp2 = json.loads(rsp)
 
-                for r in rsp.split('&') :
-                       part = r.partition('=')
-#                      print part[0] + " : " + part[2]
+			access_token = rsp2['access_token']
+#			print access_token
 
-                       if part[0] == 'access_token' :
-                                access_token = part[2]
-#				print access_token
-                       elif (part[0] == 'expires') or (part[0] == 'expires_in') :
-                                exp = part[2]
-				exp = int(exp)
-				exp = timedelta(0,exp,0)
-				exp = nw + exp
-				exp = str(exp)
-#				print exp
-				exps = exp.partition(' ')
-				time = exps[2].partition('.')
-				expire = exps[0]+'T'+time[0]+'z'
-#				print exp
+			exp = rsp2['expires_in']
+#			print exp
+
+		except :
+	
+	                for r in rsp.split('&') :
+	                       part = r.partition('=')
+	                      #print part[0] + " : " + part[2]
+
+	                       if part[0] == 'access_token' :
+	                                access_token = part[2]
+	                       elif (part[0] == 'expires') :
+	                                exp = part[2]
 
 				#2013-09-07 14:05:33.767074
 #	               expire = "2014-06-01T00:00:00z" 
+
+		exp = int(exp)
+		exp = timedelta(0,exp,0)
+		exp = nw + exp
+		exp = str(exp)
+		exps = exp.partition(' ')
+		time = exps[2].partition('.')
+		expire = exps[0]+'T'+time[0]+'z'
+
+#		print expire
 
 #	        session = oauthSrv.get_auth_session(data = {'code': data["code"], 'redirect_uri': redirecturi})
 		session = oauthSrv.get_session(access_token)
 		resp = session.get(idservice).json()
 #		print resp
 		#hardcoded - MUDAR
-		name = resp['username']
+		name = name_field
 
 	        for att, value in resp.iteritems():
 #			print att, value
