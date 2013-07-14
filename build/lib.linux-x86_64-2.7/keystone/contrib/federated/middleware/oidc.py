@@ -79,7 +79,7 @@ LOG = logging.getLogger(__name__)
 global oauthSrv
 global redirecturi
 global state
-global oidc_iss
+global endpoint_int
 global clientid
 
 class RequestIssuingService(object):
@@ -91,7 +91,7 @@ class RequestIssuingService(object):
 	global oauthSrv
 	global redirecturi
 	global state
-	global oidc_iss
+	global endpoint_int
 	global clientid
 
         endpoint_pub = None
@@ -112,7 +112,6 @@ class RequestIssuingService(object):
 	clientid = endpoints[0].get("client_id",None)
 	clientsec = endpoints[0].get("client_secret",None)
 	scope = endpoints[0].get("scope",None)
-	oidc_iss = endpoints[0].get("issuer",None)
 
         #OIDC: Append openid scope, if not included on the scope list
         if scope.find("openid") == -1:
@@ -272,12 +271,12 @@ class CredentialValidator(object):
 #	print expire
 
 	# Validate Issuer
-	if iss != oidc_iss :
+	if endpoint_int.find(iss) == -1:
                 print "Invalid OpenID Connect issuer: "+iss
                 return name, expire, issuers
 
 	# Validate Client_ID
-	if aud.find(clientid) == -1:
+	if aud != clientid:
                 print "Invalid OpenID Connect audience: "+aud
                 return name, expire, issuers
 
