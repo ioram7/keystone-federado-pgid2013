@@ -79,6 +79,7 @@ LOG = logging.getLogger(__name__)
 global oauthSrv
 global redirecturi
 global state
+global oidc_iss
 
 class RequestIssuingService(object):
     def __init__(self):
@@ -89,6 +90,7 @@ class RequestIssuingService(object):
 	global oauthSrv
 	global redirecturi
 	global state
+	global oidc_iss
 
         endpoint_pub = None
         endpoint_int = None
@@ -108,6 +110,7 @@ class RequestIssuingService(object):
 	clientid = endpoints[0].get("client_id",None)
 	clientsec = endpoints[0].get("client_secret",None)
 	scope = endpoints[0].get("scope",None)
+	oidc_iss = endpoints[0].get("issuer",None)
 
         #OIDC: Append openid scope, if not included on the scope list
         if scope.find("openid") == -1:
@@ -189,21 +192,10 @@ class CredentialValidator(object):
         context['interface'] = 'adminurl'
         context['path'] = ""
 
-	#Ioram
-#	print (data)
-#	print (realm_id)
-
-#       print ("oath: ", oauthSrv)
-#       print ("ruri: ", redirecturi)
-#	print ("code: ", data["code"])
-#	print ("code: ", data["state"])
-
-        idservice = "userinfo"
+	# Default resp values
 	name      = "sub"
 	expire    = "" 
-	resp      = {}
 	issuers   = {}
-	atts      = {}
 
 	# exit if state don't match (no attributes will be returned)
 	if state != data["state"] :
@@ -212,122 +204,135 @@ class CredentialValidator(object):
 
 	if oauthSrv is None or redirecturi is None :
 		print "No oauthSrv or no redirecturi"
-	else :
-                prms = {
-                    'code': data["code"],
-                    'grant_type': 'authorization_code',
-                    'redirect_uri': redirecturi,
-                }
-                #print prms
+	        return name, expire, issuers 
 
-                at_resp = oauthSrv.get_raw_access_token(data=prms)
-                rsp = at_resp.content
-#		print rsp
-		try :
-			rsp2 = json.loads(rsp)
+	prms = {
+		'code': data["code"],
+		'grant_type': 'authorization_code',
+		'redirect_uri': redirecturi,
+	}
+#	print prms
 
-			access_token = rsp2['access_token']
-#			print access_token
+	at_resp = oauthSrv.get_raw_access_token(data=prms)
+	rsp = at_resp.content
+#	print rsp
+	try :
+		rsp2 = json.loads(rsp)
 
-			idtoken = rsp2['id_token']
-#			print idtoken
-	
-			tt = rsp2['token_type']
-#			print tt
+		access_token = rsp2['access_token']
+#		print access_token
+		idtoken = rsp2['id_token']
+#		print idtoken
+		tt = rsp2['token_type']
+#		print tt
 
-#			if rsp2.get('expires_in'):
-#				exp = rsp2['expires_in']
-#				print exp
+	except :
+                print "Invalid OpenID Connect access token."
+                return name, expire, issuers
 
-		except :
-                        print "Invalid OpenID Connect access token."
-                        return name, expire, issuers
+	# Validate Token Type
 
-		# Validate Token Type
+	if tt != 'Bearer' :
+                print "Invalid OpenID Connect token type format: "+tt
+                return name, expire, issuers
 
-		if tt != 'Bearer' :
-                        print "Invalid OpenID Connect token type format: "+tt
-                        return name, expire, issuers
-
-		# Validate ID Token
+	# Validate ID Token
 		
-		idts = idtoken.split('.')[1]
-#		print idts
+	idts = idtoken.split('.')[1]
+#	print idts
 
-		# Base64 Padding
-		npad = 4 - (len(idts) % 4)
-		pad = ""
-		for i in range(0, npad) :
-			pad = pad + "="
+	# Base64 Padding
+	npad = 4 - (len(idts) % 4)
+	pad = ""
+	for i in range(0, npad) :
+		pad = pad + "="
 
-		# Base64 Decode	
-		try :
-			dec_idtoken = base64.b64decode(idts+pad)
-			idtoken = json.loads(dec_idtoken)
-			iss = idtoken['iss']
-			exp = idtoken['exp']
+	# Base64 Decode	
+	try :
+		dec_idtoken = base64.b64decode(idts+pad)
+		idtoken = json.loads(dec_idtoken)
+		iss = idtoken['iss']
+		exp = idtoken['exp']
+		sub = idtoken['sub']
 
-#			print idtoken['iss']
-#			print idtoken['sub']
-#			print idtoken['aud']
-#			print idtoken['exp']
-#			print idtoken['iat']
+#		print idtoken['iss']
+#		print idtoken['sub']
+#		print idtoken['aud']
+#		print idtoken['exp']
+#		print idtoken['iat']
 
-		except :
-			print "OpenID Connect id token decoding error."
-                        return name, expire, issuers
+	except :
+		print "OpenID Connect id token decoding error."
+                return name, expire, issuers
 		
-		# Format expiration date
+	# Format expiration date
 
-		exp = int(exp)
-		exp = datetime.fromtimestamp(exp)
-		exp = str(exp)
-		exps = exp.partition(' ')
-		time = exps[2].partition('.')
-		expire = exps[0]+'T'+time[0]+'z'
-#		print expire
+	exp = int(exp)
+	exp = datetime.fromtimestamp(exp)
+	exp = str(exp)
+	exps = exp.partition(' ')
+	time = exps[2].partition('.')
+	expire = exps[0]+'T'+time[0]+'z'
+#	print expire
 
-		# Verify Issuer (TODO)
+	# Validate Issuer
+
+	if iss != oidc_iss :
+                print "Invalid OpenID Connect issuer: "+iss
+                return name, expire, issuers
 
 
-#	        session = oauthSrv.get_auth_session(data = {'code': data["code"], 'redirect_uri': redirecturi})
-		session = oauthSrv.get_session(access_token)
-		resp = session.get(idservice).json()
-#		print resp
+	# Get User Info
 
-	        for att, value in resp.iteritems():
-#			print att, value
-			if isinstance(value, list):
-				try :
-					atts[att] += value
-				except :
-					atts[att] = value
+	idservice = "userinfo"
+	session   = oauthSrv.get_session(access_token)
+	resp      = session.get(idservice).json()
+#	print resp
 
-			elif isinstance(value, unicode) :
-				try : 
-					atts[att].append(value)
-				except :
-					atts[att] = [value]
-			else :
-				v = unicode(value)
-				try : 
-					atts[att].append(v)
-				except :
-					atts[att] = [v]
-#		print atts
+	atts      = {}
+	for att, value in resp.iteritems():
+#		print att, value
+		if isinstance(value, list):
+			try :
+				atts[att] += value
+			except :
+				atts[att] = value
 
-		issuers = self.check_issuers(data, atts, realm_id)
+		elif isinstance(value, unicode) :
+			try : 
+				atts[att].append(value)
+			except :
+				atts[att] = [value]
+		else :
+			v = unicode(value)
+			try : 
+				atts[att].append(v)
+			except :
+				atts[att] = [v]
+#	print atts
+
+	# Validate sub
+
+#	print sub, atts['sub'][0]	
+	if sub != atts['sub'][0] :
+                print "OpenID Connect user mismatch: "+sub+", "+atts['sub'][0]
+                return name, expire, issuers
+
+	# Check valid attributes (registered on mysql tables)
+
+	issuers = self.check_issuers(data, atts, realm_id)
 
 #	print "name   : ",name
 #	print "expire : ",expire
 #	print "issuers: ",issuers
 
-#######
+####### SAML Return Example
+#
 #name   :  _3409b1498beb31e0194afe984c61fda80de968c6e7
 #expires:  2013-07-08T03:22:36Z
 #issuers:  {'eduPersonPrincipalName': ['studentstudent@idp.ect.ufrn.br'], 'brEduAffiliationType': ['student']}	
+#
 #######
-
         return name, expire, issuers 
 
     def check_issuers(self, data, atts, realm_id):
