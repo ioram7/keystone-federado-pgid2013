@@ -241,14 +241,20 @@ class CredentialValidator(object):
 	for i in range(0, npad) :
 		pad = pad + "="
 
+	azp = ""
 	# Base64 Decode	
 	try :
 		dec_idtoken = base64.b64decode(idts+pad)
 		idtoken = json.loads(dec_idtoken)
+#		print idtoken
+
 		iss = idtoken['iss']
 		exp = idtoken['exp']
 		sub = idtoken['sub']
 		aud = idtoken['aud']
+
+		if idtoken.get('azp') :
+			azp = idtoken['azp']
 
 		#print "iss:"+ idtoken['iss']
 		#print "sub:"+ idtoken['sub']
@@ -278,6 +284,11 @@ class CredentialValidator(object):
 	# Validate Client_ID
 	if aud != clientid:
                 print "Invalid OpenID Connect audience: "+aud
+                return name, expire, issuers
+
+	# Validate AuthoriZed Party
+	if azp != "" and azp != clientid:
+                print "Invalid OpenID Connect authorized party: "+azp
                 return name, expire, issuers
 
 	# Get User Info
