@@ -80,6 +80,7 @@ global oauthSrv
 global redirecturi
 global state
 global oidc_iss
+global clientid
 
 class RequestIssuingService(object):
     def __init__(self):
@@ -91,6 +92,7 @@ class RequestIssuingService(object):
 	global redirecturi
 	global state
 	global oidc_iss
+	global clientid
 
         endpoint_pub = None
         endpoint_int = None
@@ -125,11 +127,6 @@ class RequestIssuingService(object):
 	else :
 		redirecturi = ruritmp + "/"
 
-#	print ("edp:  ", edpid)
-#	print ("clid: ", clientid)
-#	print ("clsc: ", clientsec)
-#	print ("rusi: ", redirecturi)
-
 	oauthSrv = OAuth2Service(
 	    client_id=clientid,
 	    client_secret=clientsec,
@@ -137,8 +134,6 @@ class RequestIssuingService(object):
 	    authorize_url=endpoint_pub,
 	    access_token_url=endpoint_int,
 	    base_url=endpoint_adm)
-
-#	print ("oath: ", oauthSrv)
 
 	state = ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for x in range(12))
 #	print state
@@ -254,12 +249,13 @@ class CredentialValidator(object):
 		iss = idtoken['iss']
 		exp = idtoken['exp']
 		sub = idtoken['sub']
+		aud = idtoken['aud']
 
-#		print idtoken['iss']
-#		print idtoken['sub']
-#		print idtoken['aud']
-#		print idtoken['exp']
-#		print idtoken['iat']
+		#print "iss:"+ idtoken['iss']
+		#print "sub:"+ idtoken['sub']
+		#print "aud:"+ idtoken['aud']
+		#print "exp:"+ idtoken['exp']
+		#print "iat:"+ idtoken['iat']
 
 	except :
 		print "OpenID Connect id token decoding error."
@@ -276,11 +272,14 @@ class CredentialValidator(object):
 #	print expire
 
 	# Validate Issuer
-
 	if iss != oidc_iss :
                 print "Invalid OpenID Connect issuer: "+iss
                 return name, expire, issuers
 
+	# Validate Client_ID
+	if aud.find(clientid) == -1:
+                print "Invalid OpenID Connect audience: "+aud
+                return name, expire, issuers
 
 	# Get User Info
 
@@ -291,7 +290,6 @@ class CredentialValidator(object):
 
 	atts      = {}
 	for att, value in resp.iteritems():
-#		print att, value
 		if isinstance(value, list):
 			try :
 				atts[att] += value
@@ -326,36 +324,18 @@ class CredentialValidator(object):
 #	print "expire : ",expire
 #	print "issuers: ",issuers
 
-####### SAML Return Example
-#
-#name   :  _3409b1498beb31e0194afe984c61fda80de968c6e7
-#expires:  2013-07-08T03:22:36Z
-#issuers:  {'eduPersonPrincipalName': ['studentstudent@idp.ect.ufrn.br'], 'brEduAffiliationType': ['student']}	
-#
-#######
         return name, expire, issuers 
 
     def check_issuers(self, data, atts, realm_id):
-#	print ("check_issuers")
         context = {"is_admin": True}
         valid_atts = {}
 	i = 1
         for att in atts:
-#	   print("Att: "+att)
            for val in atts[att]:
-#	       uv = unicode(val)
-#	       print("Val: "+uv)
                org_atts = self.org_mapping_api.list_org_attributes(context)['org_attributes']
                for org_att in org_atts:
-#		   print ("OrgType: "+org_att['type'])
-#		   if org_att['value'] is not None : 
-#			   print ("OrgVal : "+org_att['value'])
-#		   else :
-#			   print ("OrgVal : None")
                    if org_att['type'] == att:
-#		       print("OrgType == att")
                        if org_att['value'] == val or org_att['value'] is None:
-#			   print("OrgVal == val, or none")
                            try:
                                self.org_mapping_api.check_attribute_can_be_issued(context, service_id=realm_id, org_attribute_id=org_att['id'])
                                try:
