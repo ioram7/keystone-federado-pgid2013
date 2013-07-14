@@ -110,7 +110,11 @@ class RequestIssuingService(object):
 	edpid = endpoints[0].get("id",None)
 	clientid = endpoints[0].get("client_id",None)
 	clientsec = endpoints[0].get("client_secret",None)
-        idservice = endpoints[0].get("id_service",None)
+
+        edps = endpoint_adm.rpartition('/')
+	idservice = edps[2]
+	endpoint_adm = edps[0]+edps[1]
+
 	scope = endpoints[0].get("scope",None)
 	name_field = endpoints[0].get("name_field",None)
 

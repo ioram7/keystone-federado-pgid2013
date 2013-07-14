@@ -113,6 +113,12 @@ class RequestIssuingService(object):
 	clientsec = endpoints[0].get("client_secret",None)
 	scope = endpoints[0].get("scope",None)
 
+	if endpoint_adm.find('userinfo') != -1 :
+		edps = endpoint_adm.rpartition('/')
+		endpoint_adm = edps[0] + edps[1]
+	elif endpoint_adm[-1] != '/' :
+		endpoint_adm = endpoint_adm + '/'
+
         #OIDC: Append openid scope, if not included on the scope list
         if scope.find("openid") == -1:
             if scope == "" :
