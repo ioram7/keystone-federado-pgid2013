@@ -198,6 +198,7 @@ class FederatedAuthentication(wsgi.Middleware):
         context_q = {'is_admin': True, "query_string":{}, "path":""}
         toMap = mapper.map(context, attributes=attributes)['attribute_mappings']
         user_id = user['id']
+#	print user_id
         old_roles = []
         old_projects = project_api.list_user_projects(context_q, user_id=user_id)
         LOG.debug("OLD USER PROJECTS")
@@ -205,6 +206,8 @@ class FederatedAuthentication(wsgi.Middleware):
         old_attributes = []
         for old in old_projects["projects"]:
             roles = role_api.list_grants(context_q, user_id=user_id, project_id=old["id"])
+# 	    print old["id"]
+#	    print roles	 
             for old_role in roles["roles"]:
                 old_attributes.append({"project":old["id"], "role":old_role["id"], "domain": old["domain_id"]})
         all_domains = domain_api.list_domains(context_q)["domains"]
@@ -215,6 +218,7 @@ class FederatedAuthentication(wsgi.Middleware):
 
         LOG.debug("OLD GRANTS")
         LOG.debug(old_attributes)
+#	print old_attributes
         if user.get('expires') is not None:
             user.pop("expires")
         avail_projects = []
@@ -232,43 +236,58 @@ class FederatedAuthentication(wsgi.Middleware):
                     if v == 'domain':
                         domains.append(k)
             for d in domains:
-                avail_projects.append({ "domain":d})
                 for r in roles:
                     new_att = {"role":r, "domain": d}
                     if new_att in old_attributes:
                         index =old_attributes.index(new_att) 
                         old_attributes.pop(index)
                     role_api.create_grant(context, user_id=user_id, role_id=r, domain_id=d)
+                    avail_projects.append({ "domain":d, "role":r})
             for p in projects:
-                avail_projects.append({"project":p})
                 for r in roles:
                     LOG.debug("Adding role "+r+" to user "+user['name']+" on project "+p)
+#                    print("Adding role "+r+" to user "+user['name']+" on project "+p)
                     new_att = {"project":p, "role":r, "domain": project_api.get_project(context, project_id=p)["project"]["domain_id"]}
                     if new_att in old_attributes:
                         index =old_attributes.index(new_att)                
                         old_attributes.pop(index)
                     role_api.create_grant(context, user_id=user_id, project_id=p, role_id=r)
+                    avail_projects.append({"project":p, "role":r})
         context['query_string'] = {}
         context["method"] = "password"
         token_api = auth.controllers.Auth()
         LOG.debug(old_attributes)
+#	print old_attributes
         for old in old_attributes:
             if old.get("project", None) is not None:
                 role_api.revoke_grant(context, user_id=user_id, project_id=old["project"], role_id=old["role"])
             else:
                 role_api.revoke_grant(context, user_id=user_id, domain_id=old["domain"], role_id=old["role"])
+
         LOG.debug("getting unscoped token")
         unscoped_token = token_api.authenticate_for_token(context, auth={"identity": {"methods": ["password"],"password": {"user": {"id": user_id, "password": password}}}})
         projectsToReturn = []
         for proj in avail_projects:
+#	    print proj
             temp_proj = {}
 	    if proj.get("project", None) is not None:
                 temp_proj["project"] = project_api.get_project(context, project_id=proj["project"])["project"]
                 if temp_proj["project"].get("domain_id", None) is not None:
                     temp_proj["project"]["domain"] = domain_api.get_domain(context, domain_id=temp_proj["project"]["domain_id"])["domain"]
+# 	        if proj.get("role", None) is not None:
+#		    temp_proj["project"]["role"] = role_api.get_role(context, role_id=proj["role"])["role"]
             if proj.get("domain", None) is not None:
                 temp_proj["domain"] = domain_api.get_domain(context, domain_id=proj["domain"])["domain"]
-            projectsToReturn.append(temp_proj)
+# 	        if proj.get("role", None) is not None:
+#		    temp_proj["domain"]["role"] = role_api.get_role(context, role_id=proj["role"])["role"]
+
+	    # Only append a project, if it is not yet in the list
+	    flag = 1
+	    for prj in projectsToReturn :
+		if prj["project"]["id"] == temp_proj["project"]["id"] :
+			flag = 0
+	    if flag == 1:
+                projectsToReturn.append(temp_proj)
         token_data = jsonutils.loads(unscoped_token.body)
         header = unscoped_token.headers.get("X-Subject-Token")
         return header, projectsToReturn
