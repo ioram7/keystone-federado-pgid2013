@@ -1,6 +1,6 @@
 Metadata-Version: 1.1
 Name: keystone
-Version: 2013.2.a17.g07a2463
+Version: 2013.2.a19.ged83235
 Summary: Authentication service for OpenStack
 Home-page: http://www.openstack.org
 Author: OpenStack, LLC.

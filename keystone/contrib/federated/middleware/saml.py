@@ -234,9 +234,9 @@ class CredentialValidator(object):
 	    atts[att.get("Name")] = ats
 	if unique_attribute is not None and atts.get(unique_attribute, None) is not None:
             names = atts.get(unique_attribute)
-	print "name   : ", names[0]
-	print "expires: ", expires
-	print "issuers: ", self.check_issuers(data, atts, realm_id) 
+#	print "name   : ", names[0]
+#	print "expires: ", expires
+#	print "issuers: ", self.check_issuers(data, atts, realm_id) 
         return names[0], expires, self.check_issuers(data, atts, realm_id)
 
     def check_issuers(self, data, atts, realm_id):
