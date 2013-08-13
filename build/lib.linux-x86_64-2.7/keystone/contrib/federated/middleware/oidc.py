@@ -57,6 +57,7 @@ import uuid
 from keystone import exception
 sys.path.insert(0, '../')
 from os.path import dirname, basename
+
 from time import localtime, strftime, gmtime
 import urllib
 import webbrowser
@@ -93,6 +94,9 @@ class RequestIssuingService(object):
 	global state
 	global endpoint_int
 	global clientid
+
+	#Key e issuer sao parametros p/ SAML (key = Chave privada RSA, issuer = Identificador do emissor")
+	#print "key: "+key+" issuer: "+issuer;
 
         endpoint_pub = None
         endpoint_int = None
@@ -192,6 +196,9 @@ class CredentialValidator(object):
         context['interface'] = 'adminurl'
         context['path'] = ""
 
+	#Ioram
+#	print "Data: "+data;
+
 	# Default resp values
 	name      = "sub"
 	expire    = "" 
@@ -252,7 +259,7 @@ class CredentialValidator(object):
 	try :
 		dec_idtoken = base64.b64decode(idts+pad)
 		idtoken = json.loads(dec_idtoken)
-#		print idtoken
+		#print idtoken
 
 		iss = idtoken['iss']
 		exp = idtoken['exp']
@@ -278,17 +285,25 @@ class CredentialValidator(object):
 	exp = datetime.fromtimestamp(exp)
 	exp = str(exp)
 	exps = exp.partition(' ')
-	time = exps[2].partition('.')
-	expire = exps[0]+'T'+time[0]+'z'
+	timee = exps[2].partition('.')
+	expire = exps[0]+'T'+timee[0]+'z'
 #	print expire
 
 	# Validate Issuer
+	# If last characters of issuer is /, remove it. (failed to check GidLab IdP due missing port :8080)
+	if iss[-1] == '/':
+		iss = iss[:-1]
 	if endpoint_int.find(iss) == -1:
                 print "Invalid OpenID Connect issuer: "+iss
                 return name, expire, issuers
 
 	# Validate Client_ID
-	if aud != clientid:
+	# Check if AUD is a list, and if so, check if client is an element (GidLab IdP)
+	if isinstance(aud, list):
+		if not any(clientid == s for s in aud) :
+	                print "Invalid OpenID Connect audience: "+','.join(aud)
+	                return name, expire, issuers
+	elif aud != clientid:
                 print "Invalid OpenID Connect audience: "+aud
                 return name, expire, issuers
 
@@ -311,18 +326,21 @@ class CredentialValidator(object):
 				atts[att] += value
 			except :
 				atts[att] = value
+# 			print "att: "+att+" value: "+','.join(value)
 
 		elif isinstance(value, unicode) :
 			try : 
 				atts[att].append(value)
 			except :
 				atts[att] = [value]
+ #			print "att: "+att+" value: "+value
 		else :
 			v = unicode(value)
 			try : 
 				atts[att].append(v)
 			except :
 				atts[att] = [v]
+# 			print "att: "+att+" value: "+v
 #	print atts
 
 	# Validate sub

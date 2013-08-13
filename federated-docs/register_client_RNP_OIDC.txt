@@ -1,0 +1,23 @@
+curl -X POST -H "Content-Type: application/json" -H "Accept: application/json" 
+http://openid-provider.gidlab.rnp.br/openid-connect-server/register 
+-d '{"application_type": "web", "redirect_uris": ["https://localhost:8080/"]
+, "client_name": "PGId/UFPE Openstack", "token_endpoint_auth_method": "client_secret_basic"
+, "contacts": ["iss@cin.ufpe.br", "cagf@cin.ufpe.br"], "request_uris": ["http://openstack.bsbbs.com.br"]}'
+
+{"client_id":"9bb14f58-f542-4562-a904-5aea05b62c41"
+,"client_secret":"AO9UC5zxk8mH1cdv0fOvoa2QsPKi5L781arZnL8XdU-D6Vux7tYhxbCKpCYx7aeisPr6bA7heZXqn2hsSBnZ9WQ"
+,"client_secret_expires_at":0,"client_id_issued_at":1376007235
+,"registration_access_token":"eyJhbGciOiJSUzI1NiJ9.eyJleHAiOjEzNzYwMTA4MzUsImF1ZCI6WyI5YmIxNGY1OC1mNTQyLTQ1NjItYTkwNC01YWVhMDViNjJjNDEiXSwiaXNzIjoiaHR0cDpcL1wvb3BlbmlkLXByb3ZpZGVyLmdpZGxhYi5ybnAuYnJcLyIsImp0aSI6ImU4YTAyMzkwLWViZTAtNDkzNC04ODQ2LWNmZjNjN2VhNGEzZSIsImlhdCI6MTM3NjAwNzIzNX0.xCYqjMp7QXzIc9nCar-9HCpctbGREi46uj6pEDlGACtCh5Ioyo5bKD7yP3NatSJZgL0G9n98j9IxwiCUw-Uew6QKtVySK_OKVtEHbB7AOGCvGcAuClq7rjv26FiHgqLggS6C87kdJoWPlfhgLQfCuF17tZEPhwtsnL8W0fVhdW4"
+,"registration_client_uri":"http://openid-provider.gidlab.rnp.br/register/9bb14f58-f542-4562-a904-5aea05b62c41"
+,"redirect_uris":["https://localhost:8080/"]
+,"client_name":"PGId/UFPE Openstack"
+,"contacts":["cagf@cin.ufpe.br","iss@cin.ufpe.br"]
+,"token_endpoint_auth_method":"client_secret_basic"
+,"scope":"phone openid offline_access address email profile"
+,"grant_types":["authorization_code","refresh_token"]
+,"response_types":["code"]
+,"application_type":"web"
+,"default_acr_values":[]
+,"request_uris":["http://openstack.bsbbs.com.br"]}
+
+
