@@ -22,6 +22,7 @@ dist/keystone-2013.2.a17.g07a2463-py2.7.egg
 dist/keystone-2013.2.a18.g497d816-py2.7.egg
 dist/keystone-2013.2.a19.ged83235-py2.7.egg
 dist/keystone-2013.2.a2.g3feeda9-py2.7.egg
+dist/keystone-2013.2.a21.g70cd1cd-py2.7.egg
 dist/keystone-2013.2.a3.g54a44d5-py2.7.egg
 dist/keystone-2013.2.a4.g8950786-py2.7.egg
 dist/keystone-2013.2.a5.g43ee607-py2.7.egg
@@ -84,9 +85,14 @@ examples/pki/private/cakey.pem
 examples/pki/private/signing_key.pem
 examples/pki/private/ssl_key.pem
 federated-docs/AddIdP.py
+federated-docs/AddIdP_OIDC_RNP.py
+federated-docs/AddIdP_OIDC_RNP_Attr.py
+federated-docs/AddIdP_OIDC_RNP_Map.py
+federated-docs/AddIdP_RNP.py
 federated-docs/devstack-README
 federated-docs/example-keystone.conf
 federated-docs/example-setup-script.py
+federated-docs/register_client_RNP_OIDC.txt
 httpd/README
 httpd/keystone.conf
 httpd/keystone.py

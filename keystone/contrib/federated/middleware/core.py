@@ -116,7 +116,7 @@ class FederatedAuthentication(wsgi.Middleware):
        
         if 'idpResponse' in data:
 #	    print "idpResponse"
-            username, expires, validatedUserAttributes = self.validate(data, data['realm'])		
+            username, expires, validatedUserAttributes = self.validate(data, data['realm'])
             identity_api = identity.controllers.UserV3()
             user_manager = user_management.UserManager()
             user, tempPass = user_manager.manage(username, expires)
@@ -164,19 +164,25 @@ class FederatedAuthentication(wsgi.Middleware):
         if len(endpoints) < 1:
             LOG.error('No endpoint found for this service')
 #	print "getRequest: ris start"
-        ris = processing_module.RequestIssuingService()
+        self.ris = processing_module.RequestIssuingService()
 #	print "getRequest: ris end", ris
-        return ris.getIdPRequest(CONF.federated.requestSigningKey, CONF.federated.SPName, endpoints)
+        return self.ris.getIdPRequest(CONF.federated.requestSigningKey, CONF.federated.SPName, endpoints)
 
     def validate(self, data, realm):
         ''' Get the validated attributes '''
+#        print "VALIDATE"
         catalog_api = catalog.controllers.ServiceV3()
         context = {'is_admin': True}
         service = catalog_api.get_service(context=context, service_id=realm['id'])['service']
         type = service["type"].split('.')[1]
+#	print "validate: type = ",type
         processing_module = load_protocol_module(type)
+#	print "validate: ProcessingModule loaded"
+#	print "validate: credential validator start"
         cred_validator = processing_module.CredentialValidator()
-        return cred_validator.validate(data['idpResponse'], service['id'])
+#	print "validate: credential validator end", cred_validator
+#       print "validate: data = ", data['idpResponse']
+        return cred_validator.validate(data['idpResponse'], service['id'], self.ris)
 
     def negotiate(self, data):
         ''' Process a negotiation between an Idp and client '''

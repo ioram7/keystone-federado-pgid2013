@@ -203,7 +203,7 @@ class CredentialValidator(object):
     def __call__(self):
         return None
         
-    def validate(self, data, realm_id):
+    def validate(self, data, realm_id, ris):
         context = {}
         context['is_admin'] = True
         context['query_string'] = {}
@@ -216,9 +216,11 @@ class CredentialValidator(object):
         k, v = resp[0]
         try:
             resp = base64.b64decode(v)
+	    #print resp;
             resp = ElementTree(fromstring(resp))
         except TypeError:
             resp = base64.b64decode(v.replace(" ", "+"))
+	    #print resp;
             resp = ElementTree(fromstring(resp))
         atts = {}
         names = []
@@ -234,9 +236,9 @@ class CredentialValidator(object):
 	    atts[att.get("Name")] = ats
 	if unique_attribute is not None and atts.get(unique_attribute, None) is not None:
             names = atts.get(unique_attribute)
-	print "name   : ", names[0]
-	print "expires: ", expires
-	print "issuers: ", self.check_issuers(data, atts, realm_id) 
+#	print "name   : ", names[0]
+#	print "expires: ", expires
+#	print "issuers: ", self.check_issuers(data, atts, realm_id) 
         return names[0], expires, self.check_issuers(data, atts, realm_id)
 
     def check_issuers(self, data, atts, realm_id):

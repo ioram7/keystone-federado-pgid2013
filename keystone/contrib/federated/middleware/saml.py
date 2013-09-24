@@ -203,7 +203,7 @@ class CredentialValidator(object):
     def __call__(self):
         return None
         
-    def validate(self, data, realm_id):
+    def validate(self, data, realm_id, ris):
         context = {}
         context['is_admin'] = True
         context['query_string'] = {}
@@ -216,9 +216,11 @@ class CredentialValidator(object):
         k, v = resp[0]
         try:
             resp = base64.b64decode(v)
+	    #print resp;
             resp = ElementTree(fromstring(resp))
         except TypeError:
             resp = base64.b64decode(v.replace(" ", "+"))
+	    #print resp;
             resp = ElementTree(fromstring(resp))
         atts = {}
         names = []

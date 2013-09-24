@@ -75,23 +75,17 @@ from keystone.contrib import mapping
 from keystone import catalog
 LOG = logging.getLogger(__name__)
 
-global oauthSrv
-global redirecturi
-global idservice
-global state
-global name_field
-
 class RequestIssuingService(object):
     def __init__(self):
 	self.tmpl_req = ""
 
     # ris.getIdPRequest(CONF.federated.requestSigningKey, CONF.federated.SPName, endpoint)
     def getIdPRequest(self, key, issuer, endpoints):
-	global oauthSrv
-	global redirecturi
-	global idservice
-	global state
-	global name_field
+#	global oauthSrv
+#	global redirecturi
+#	global idservice
+#	global state
+#	global name_field
 
         endpoint_pub = None
         endpoint_int = None
@@ -112,24 +106,24 @@ class RequestIssuingService(object):
 	clientsec = endpoints[0].get("client_secret",None)
 
         edps = endpoint_adm.rpartition('/')
-	idservice = edps[2]
+	self.idservice = edps[2]
 	endpoint_adm = edps[0]+edps[1]
 
 	scope = endpoints[0].get("scope",None)
-	name_field = endpoints[0].get("name_field",None)
+	self.name_field = endpoints[0].get("name_field",None)
 
 	ruritmp = endpoints[0].get("redirect_uri",None)
 	if len(ruritmp) > 1 and ruritmp[-1] == '/' :
-		redirecturi = ruritmp
+		self.redirecturi = ruritmp
 	else :
-		redirecturi = ruritmp + "/"
+		self.redirecturi = ruritmp + "/"
 
 #	print ("edp:  ", edpid)
 #	print ("clid: ", clientid)
 #	print ("clsc: ", clientsec)
-#	print ("rusi: ", redirecturi)
+#	print ("rusi: ", self.redirecturi)
 
-	oauthSrv = OAuth2Service(
+	self.oauthSrv = OAuth2Service(
 	    client_id=clientid,
 	    client_secret=clientsec,
 	    name=edpid,
@@ -137,17 +131,17 @@ class RequestIssuingService(object):
 	    access_token_url=endpoint_int,
 	    base_url=endpoint_adm)
 
-#	print ("oath: ", oauthSrv)
+	#print ("oauth: ", self.oauthSrv)
 
-	state = ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for x in range(12))
-#	print state
+	self.state = ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for x in range(12))
+	#print self.state
 
 	params = {'scope': scope,
           'response_type': 'code',
-          'state' : state,
-          'redirect_uri': redirecturi }
+          'state' : self.state,
+          'redirect_uri': self.redirecturi }
 
-	authorize_url = oauthSrv.get_authorize_url(**params)
+	authorize_url = self.oauthSrv.get_authorize_url(**params)
 	spl = authorize_url.partition('?')
 	
         resp = {}
@@ -183,7 +177,7 @@ class CredentialValidator(object):
         return None
 
     # cred_validator.validate(data['idpResponse'], service['id'])    
-    def validate(self, data, realm_id):
+    def validate(self, data, realm_id, ris):
         context = {}
         context['is_admin'] = True
         context['query_string'] = {}
@@ -195,8 +189,8 @@ class CredentialValidator(object):
 #	print (data)
 #	print (realm_id)
 
-#       print ("oath: ", oauthSrv)
-#       print ("ruri: ", redirecturi)
+#       print ("oath: ", ris.oauthSrv)
+#       print ("ruri: ", ris.redirecturi)
 #	print ("code: ", data["code"])
 #	print ("code: ", data["state"])
 
@@ -210,21 +204,21 @@ class CredentialValidator(object):
 #	print nw
 
 	# exit if state don't match (no attributes will be returned)
-	if state != data["state"] :
+	if ris.state != data["state"] :
 		print "State doesn't match."
 	        return name, expire, issuers 
 
-	if oauthSrv is None or redirecturi is None or idservice is None:
+	if ris.oauthSrv is None or ris.redirecturi is None or ris.idservice is None:
 		print "No oauthSrv or no redirecturi or no idservice"
 	else :
                 prms = {
                     'code': data["code"],
                     'grant_type': 'authorization_code',
-                    'redirect_uri': redirecturi,
+                    'redirect_uri': ris.redirecturi,
                 }
                 #print prms
 
-                at_resp = oauthSrv.get_raw_access_token(data=prms)
+                at_resp = ris.oauthSrv.get_raw_access_token(data=prms)
                 rsp = at_resp.content
 #		print rsp
 		try :
@@ -260,12 +254,12 @@ class CredentialValidator(object):
 
 #		print expire
 
-#	        session = oauthSrv.get_auth_session(data = {'code': data["code"], 'redirect_uri': redirecturi})
-		session = oauthSrv.get_session(access_token)
-		resp = session.get(idservice).json()
+#	        session = ris.oauthSrv.get_auth_session(data = {'code': data["code"], 'redirect_uri': ris.redirecturi})
+		session = ris.oauthSrv.get_session(access_token)
+		resp = session.get(ris.idservice).json()
 #		print resp
 		#hardcoded - MUDAR
-		name = name_field
+		name = ris.name_field
 
 	        for att, value in resp.iteritems():
 #			print att, value

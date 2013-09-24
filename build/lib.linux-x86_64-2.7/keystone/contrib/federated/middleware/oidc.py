@@ -77,43 +77,32 @@ from keystone.contrib import mapping
 from keystone import catalog
 LOG = logging.getLogger(__name__)
 
-global oauthSrv
-global redirecturi
-global state
-global endpoint_int
-global clientid
-
 class RequestIssuingService(object):
     def __init__(self):
 	self.tmpl_req = ""
 
     # ris.getIdPRequest(CONF.federated.requestSigningKey, CONF.federated.SPName, endpoint)
     def getIdPRequest(self, key, issuer, endpoints):
-	global oauthSrv
-	global redirecturi
-	global state
-	global endpoint_int
-	global clientid
 
 	#Key e issuer sao parametros p/ SAML (key = Chave privada RSA, issuer = Identificador do emissor")
 	#print "key: "+key+" issuer: "+issuer;
 
         endpoint_pub = None
-        endpoint_int = None
+        self.endpoint_int = None
         endpoint_adm = None
         if not len(endpoints) < 1:
             for e in endpoints:
                 if e['interface'] == 'public':
                     endpoint_pub = e['url']
                 elif e['interface'] == 'internal':
-                    endpoint_int = e['url']
+                    self.endpoint_int = e['url']
                 elif e['interface'] == 'admin':
                     endpoint_adm = e['url']
         else:
             LOG.error('No endpoint found for this service')
 
 	edpid = endpoints[0].get("id",None)
-	clientid = endpoints[0].get("client_id",None)
+	self.clientid = endpoints[0].get("client_id",None)
 	clientsec = endpoints[0].get("client_secret",None)
 	scope = endpoints[0].get("scope",None)
 
@@ -132,27 +121,27 @@ class RequestIssuingService(object):
 
 	ruritmp = endpoints[0].get("redirect_uri",None)
 	if len(ruritmp) > 1 and ruritmp[-1] == '/' :
-		redirecturi = ruritmp
+		self.redirecturi = ruritmp
 	else :
-		redirecturi = ruritmp + "/"
+		self.redirecturi = ruritmp + "/"
 
-	oauthSrv = OAuth2Service(
-	    client_id=clientid,
+	self.oauthSrv = OAuth2Service(
+	    client_id=self.clientid,
 	    client_secret=clientsec,
 	    name=edpid,
 	    authorize_url=endpoint_pub,
-	    access_token_url=endpoint_int,
+	    access_token_url=self.endpoint_int,
 	    base_url=endpoint_adm)
 
-	state = ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for x in range(12))
-#	print state
+	self.state = ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for x in range(12))
+#	print self.state
 
 	params = {'scope': scope,
           'response_type': 'code',
-          'state' : state,
-          'redirect_uri': redirecturi }
+          'state' : self.state,
+          'redirect_uri': self.redirecturi }
 
-	authorize_url = oauthSrv.get_authorize_url(**params)
+	authorize_url = self.oauthSrv.get_authorize_url(**params)
 	spl = authorize_url.partition('?')
 	
         resp = {}
@@ -188,7 +177,13 @@ class CredentialValidator(object):
         return None
 
     # cred_validator.validate(data['idpResponse'], service['id'])    
-    def validate(self, data, realm_id):
+    def validate(self, data, realm_id, ris):
+
+	#Ioram
+	#print "OIDC validate"
+	#print "OIDC Data: ", data;
+	#print "OIDC RealmID: ", realm_id;
+
         context = {}
         context['is_admin'] = True
         context['query_string'] = {}
@@ -196,8 +191,7 @@ class CredentialValidator(object):
         context['interface'] = 'adminurl'
         context['path'] = ""
 
-	#Ioram
-#	print "Data: "+data;
+	#print "OIDC validate - context set"
 
 	# Default resp values
 	name      = "sub"
@@ -205,33 +199,33 @@ class CredentialValidator(object):
 	issuers   = {}
 
 	# exit if state don't match (no attributes will be returned)
-	if state != data["state"] :
+	if ris.state != data["state"] :
 		print "State doesn't match."
 	        return name, expire, issuers 
 
-	if oauthSrv is None or redirecturi is None :
+	if ris.oauthSrv is None or ris.redirecturi is None :
 		print "No oauthSrv or no redirecturi"
 	        return name, expire, issuers 
 
 	prms = {
 		'code': data["code"],
 		'grant_type': 'authorization_code',
-		'redirect_uri': redirecturi,
+		'redirect_uri': ris.redirecturi,
 	}
-#	print prms
+	#print prms
 
-	at_resp = oauthSrv.get_raw_access_token(data=prms)
+	at_resp = ris.oauthSrv.get_raw_access_token(data=prms)
 	rsp = at_resp.content
-#	print rsp
+	#print rsp
 	try :
 		rsp2 = json.loads(rsp)
 
 		access_token = rsp2['access_token']
-#		print access_token
+		#print access_token
 		idtoken = rsp2['id_token']
-#		print idtoken
+		#print idtoken
 		tt = rsp2['token_type']
-#		print tt
+		#print tt
 
 	except :
                 print "Invalid OpenID Connect access token."
@@ -293,29 +287,29 @@ class CredentialValidator(object):
 	# If last characters of issuer is /, remove it. (failed to check GidLab IdP due missing port :8080)
 	if iss[-1] == '/':
 		iss = iss[:-1]
-	if endpoint_int.find(iss) == -1:
+	if ris.endpoint_int.find(iss) == -1:
                 print "Invalid OpenID Connect issuer: "+iss
                 return name, expire, issuers
 
 	# Validate Client_ID
 	# Check if AUD is a list, and if so, check if client is an element (GidLab IdP)
 	if isinstance(aud, list):
-		if not any(clientid == s for s in aud) :
+		if not any(ris.clientid == s for s in aud) :
 	                print "Invalid OpenID Connect audience: "+','.join(aud)
 	                return name, expire, issuers
-	elif aud != clientid:
+	elif aud != ris.clientid:
                 print "Invalid OpenID Connect audience: "+aud
                 return name, expire, issuers
 
 	# Validate AuthoriZed Party
-	if azp != "" and azp != clientid:
+	if azp != "" and azp != ris.clientid:
                 print "Invalid OpenID Connect authorized party: "+azp
                 return name, expire, issuers
 
 	# Get User Info
 
 	idservice = "userinfo"
-	session   = oauthSrv.get_session(access_token)
+	session   = ris.oauthSrv.get_session(access_token)
 	resp      = session.get(idservice).json()
 #	print resp
 
