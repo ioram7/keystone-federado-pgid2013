@@ -23,6 +23,7 @@ dist/keystone-2013.2.a18.g497d816-py2.7.egg
 dist/keystone-2013.2.a19.ged83235-py2.7.egg
 dist/keystone-2013.2.a2.g3feeda9-py2.7.egg
 dist/keystone-2013.2.a21.g70cd1cd-py2.7.egg
+dist/keystone-2013.2.a22.gb362357-py2.7.egg
 dist/keystone-2013.2.a3.g54a44d5-py2.7.egg
 dist/keystone-2013.2.a4.g8950786-py2.7.egg
 dist/keystone-2013.2.a5.g43ee607-py2.7.egg
@@ -198,10 +199,11 @@ keystone/contrib/federated/middleware/__init__.py
 keystone/contrib/federated/middleware/core.py
 keystone/contrib/federated/middleware/keystonev2.py
 keystone/contrib/federated/middleware/oauth.py
-keystone/contrib/federated/middleware/oauth_bkp.py
 keystone/contrib/federated/middleware/oidc.py
 keystone/contrib/federated/middleware/oidc.py.bkp
+keystone/contrib/federated/middleware/oidci.py
 keystone/contrib/federated/middleware/saml.py
+keystone/contrib/federated/middleware/shibboleth.py
 keystone/contrib/federated/middleware/user_management.py
 keystone/contrib/federated/middleware/directory/__init__.py
 keystone/contrib/federated/middleware/directory/core.py

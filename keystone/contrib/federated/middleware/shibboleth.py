@@ -117,21 +117,17 @@ class RequestIssuingService(object):
         else:
             LOG.error('No endpoint found for this service')
         resp = {}
-        resp['idpRequest'] = '?'+self.create_IdpRequest(key, issuer)
+        resp['idpRequest'] = '&'+self.create_IdpRequest(key, issuer)
         resp['idpEndpoint'] = endpoint
         return valid_Response(resp)
 
     def sign(self,doc, key):
-	#print ("doc: ",tostring(doc))
-        #print ("key: ",key)
         node = xmlsec.findNode(doc, xmlsec.dsig("Signature"))
         dsigCtx = xmlsec.DSigCtx()
         signKey = xmlsec.Key.load(key, xmlsec.KeyDataFormatPem, None)
         signKey.name = basename(key)
         dsigCtx.signKey = signKey
         dsigCtx.sign(node)
-        #print ("node: ",tostring(node))
-        #print ("doc : ",tostring(doc))
         return tostring(doc)
 
     def create_IdpRequest(self,key, issuer):
@@ -143,14 +139,10 @@ class RequestIssuingService(object):
         for node in doc.getroot().iter():
                 if node.tag == "{urn:oasis:names:tc:SAML:2.0:assertion}Issuer":
                         node.text = issuer
-#       node = xmlsec.findNode(doc, "Issuer")
+#        node = xmlsec.findNode(doc, "Issuer")
 #       node.text = issuer
 
-	#print  self.sign(doc,key)
-	#print  self.encodeReq(self.sign(doc,key))
-
         return self.encodeReq(self.sign(doc,key))
-
     def __call__(self):
         return None
 
@@ -182,16 +174,12 @@ class RequestIssuingService(object):
         inflated += decompress.flush()
         return inflated
     def encodeReq(self, req):
-	print req
         req = self.deflate(req)
 
-	print req
         req = base64.b64encode(req)
 
-	print req
         req = urllib.urlencode({"SAMLRequest": req})
 
-	print req
         return req
 
 class Negotiator(object):

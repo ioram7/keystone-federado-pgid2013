@@ -103,7 +103,7 @@ class FederatedAuthentication(wsgi.Middleware):
     @webob.dec.wsgify(RequestClass=Request)
     def process_request(self,request):
 
-#	print request        
+	#print request        
         
         LOG.debug('Request intercepted by CVM')
         LOG.debug('--------------------------')
@@ -115,7 +115,7 @@ class FederatedAuthentication(wsgi.Middleware):
         data = jsonutils.loads(body)
        
         if 'idpResponse' in data:
-#	    print "idpResponse"
+	    #print "idpResponse"
             username, expires, validatedUserAttributes = self.validate(data, data['realm'])
             identity_api = identity.controllers.UserV3()
             user_manager = user_management.UserManager()
@@ -129,17 +129,17 @@ class FederatedAuthentication(wsgi.Middleware):
             LOG.debug(resp)
             return valid_Response(resp)
         elif 'auth' in data:
-#	    print "auth"
+	    #print "auth"
             LOG.debug("We just want to check the token and domain and forward the request")
             self.setUserDomain(data)
             LOG.debug("We set the user data")
             request.body = jsonutils.dumps(data)
             return 
         elif 'idpNegotiation' in data:
-#	    print "idpNegotiation"
+	    #print "idpNegotiation"
 	    return self.negotiate(data)
         else:
-#	    print "getRequest"
+	    #print "getRequest"
             if 'realm' in data:
                 realm_id = data['realm']
                 return self.getRequest(realm_id)
@@ -147,41 +147,41 @@ class FederatedAuthentication(wsgi.Middleware):
             return directory.getProviderList()
 
     def getRequest(self, realm):
-#	print "getRequest: Start"
-        ''' Get an authentication request to return to the client '''
+	#print "getRequest: Start"
+        #''' Get an authentication request to return to the client '''
         catalog_api = catalog.controllers.ServiceV3()
         endpoint_api = catalog.controllers.EndpointV3()
         context = {'is_admin': True}
         service = catalog_api.get_service(context=context, service_id=realm['id'])['service']
         protocol = service['type'].split('.')[1]
-#	print "getRequest: protocol = ", protocol
+	#print "getRequest: protocol = ", protocol
         processing_module = load_protocol_module(protocol)
-#	print "getRequest: ProcessingModule loaded"
+	#print "getRequest: ProcessingModule loaded"
         context['query_string'] = {}
         context['path'] = ""
         context['query_string']['service_id'] = service['id']
         endpoints = endpoint_api.list_endpoints(context)['endpoints']
         if len(endpoints) < 1:
             LOG.error('No endpoint found for this service')
-#	print "getRequest: ris start"
+	#print "getRequest: ris start"
         self.ris = processing_module.RequestIssuingService()
-#	print "getRequest: ris end", ris
+	#print "getRequest: ris end", ris
         return self.ris.getIdPRequest(CONF.federated.requestSigningKey, CONF.federated.SPName, endpoints)
 
     def validate(self, data, realm):
         ''' Get the validated attributes '''
-#        print "VALIDATE"
+        #print "VALIDATE"
         catalog_api = catalog.controllers.ServiceV3()
         context = {'is_admin': True}
         service = catalog_api.get_service(context=context, service_id=realm['id'])['service']
         type = service["type"].split('.')[1]
-#	print "validate: type = ",type
+	#print "validate: type = ",type
         processing_module = load_protocol_module(type)
-#	print "validate: ProcessingModule loaded"
-#	print "validate: credential validator start"
+	#print "validate: ProcessingModule loaded"
+	#print "validate: credential validator start"
         cred_validator = processing_module.CredentialValidator()
-#	print "validate: credential validator end", cred_validator
-#       print "validate: data = ", data['idpResponse']
+	#print "validate: credential validator end", cred_validator
+        #print "validate: data = ", data['idpResponse']
         return cred_validator.validate(data['idpResponse'], service['id'], self.ris)
 
     def negotiate(self, data):

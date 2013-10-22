@@ -57,6 +57,7 @@ import uuid
 from keystone import exception
 sys.path.insert(0, '../')
 from os.path import dirname, basename
+
 from time import localtime, strftime, gmtime
 import urllib
 import webbrowser
@@ -70,6 +71,7 @@ import re
 from datetime import timedelta, datetime
 import string
 import random
+import base64
 
 from keystone.contrib import mapping
 from keystone import catalog
@@ -82,30 +84,40 @@ class RequestIssuingService(object):
     # ris.getIdPRequest(CONF.federated.requestSigningKey, CONF.federated.SPName, endpoint)
     def getIdPRequest(self, key, issuer, endpoints):
 
+	#Key e issuer sao parametros p/ SAML (key = Chave privada RSA, issuer = Identificador do emissor")
+	#print "key: "+key+" issuer: "+issuer;
+
         endpoint_pub = None
-        endpoint_int = None
+        self.endpoint_int = None
         endpoint_adm = None
         if not len(endpoints) < 1:
             for e in endpoints:
                 if e['interface'] == 'public':
                     endpoint_pub = e['url']
                 elif e['interface'] == 'internal':
-                    endpoint_int = e['url']
+                    self.endpoint_int = e['url']
                 elif e['interface'] == 'admin':
                     endpoint_adm = e['url']
         else:
             LOG.error('No endpoint found for this service')
 
 	edpid = endpoints[0].get("id",None)
-	clientid = endpoints[0].get("client_id",None)
+	self.clientid = endpoints[0].get("client_id",None)
 	clientsec = endpoints[0].get("client_secret",None)
-
-        edps = endpoint_adm.rpartition('/')
-	self.idservice = edps[2]
-	endpoint_adm = edps[0]+edps[1]
-
 	scope = endpoints[0].get("scope",None)
-	self.name_field = endpoints[0].get("name_field",None)
+
+	if endpoint_adm.find('userinfo') != -1 :
+		edps = endpoint_adm.rpartition('/')
+		endpoint_adm = edps[0] + edps[1]
+	elif endpoint_adm[-1] != '/' :
+		endpoint_adm = endpoint_adm + '/'
+
+        #OIDC: Append openid scope, if not included on the scope list
+        if scope.find("openid") == -1:
+            if scope == "" :
+                scope = "openid"
+            else :
+                scope = "openid " + scope
 
 	ruritmp = endpoints[0].get("redirect_uri",None)
 	if len(ruritmp) > 1 and ruritmp[-1] == '/' :
@@ -113,28 +125,23 @@ class RequestIssuingService(object):
 	else :
 		self.redirecturi = ruritmp + "/"
 
-#	print ("edp:  ", edpid)
-#	print ("clid: ", clientid)
-#	print ("clsc: ", clientsec)
-#	print ("rusi: ", self.redirecturi)
-
 	self.oauthSrv = OAuth2Service(
-	    client_id=clientid,
+	    client_id=self.clientid,
 	    client_secret=clientsec,
 	    name=edpid,
 	    authorize_url=endpoint_pub,
-	    access_token_url=endpoint_int,
+	    access_token_url=self.endpoint_int,
 	    base_url=endpoint_adm)
 
-	#print ("oauth: ", self.oauthSrv)
-
 	self.state = ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for x in range(12))
-	#print self.state
+#	print self.state
+	self.nonce = ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for x in range(12))
 
 	params = {'scope': scope,
-          'response_type': 'code',
+          'response_type': 'id_token token',
           'state' : self.state,
-          'redirect_uri': self.redirecturi }
+          'redirect_uri': self.redirecturi,
+          'nonce' : self.nonce }
 
 	authorize_url = self.oauthSrv.get_authorize_url(**params)
 	spl = authorize_url.partition('?')
@@ -173,6 +180,12 @@ class CredentialValidator(object):
 
     # cred_validator.validate(data['idpResponse'], service['id'])    
     def validate(self, data, realm_id, ris):
+
+	#Ioram
+	#print "OIDC validate"
+	#print "OIDC Data: ", data;
+	#print "OIDC RealmID: ", realm_id;
+
         context = {}
         context['is_admin'] = True
         context['query_string'] = {}
@@ -180,138 +193,164 @@ class CredentialValidator(object):
         context['interface'] = 'adminurl'
         context['path'] = ""
 
-	#Ioram
-#	print (data)
-#	print (realm_id)
+	#print "OIDC validate - context set"
 
-#       print ("oath: ", ris.oauthSrv)
-#       print ("ruri: ", ris.redirecturi)
-#	print ("code: ", data["code"])
-#	print ("code: ", data["state"])
-
-	name = "error"
-	#hardcoded - MUDAR
-	expire = "2100-01-01T00:00:00z" 
-	resp = {}
-	issuers = {}
-	atts = {}
-	nw = datetime.now()
-#	print nw
+	# Default resp values
+	name      = "sub"
+	expire    = "" 
+	issuers   = {}
 
 	# exit if state don't match (no attributes will be returned)
 	if ris.state != data["state"] :
 		print "State doesn't match."
 	        return name, expire, issuers 
 
-	if ris.oauthSrv is None or ris.redirecturi is None or ris.idservice is None:
-		print "No oauthSrv or no redirecturi or no idservice"
-	else :
-                prms = {
-                    'code': data["code"],
-                    'grant_type': 'authorization_code',
-                    'redirect_uri': ris.redirecturi,
-                }
-                #print prms
+	try :
+		access_token = data['access_token']
+                tt = data['token_type']
+                idtoken = data['id_token']
 
-                at_resp = ris.oauthSrv.get_raw_access_token(data=prms)
-                rsp = at_resp.content
-#		print rsp
-		try :
-			rsp2 = json.loads(rsp)
+	except :
+               print "Invalid OpenID Connect access token."
+               return name, expire, issuers
 
-			access_token = rsp2['access_token']
-#			print access_token
+	# Validate Token Type
+	if tt != 'Bearer' :
+                print "Invalid OpenID Connect token type format: "+tt
+                return name, expire, issuers
 
-			exp = rsp2['expires_in']
-#			print exp
+	# Validate ID Token
+	idts = idtoken.split('.')[1]
+#	print idts
 
-		except :
-	
-	                for r in rsp.split('&') :
-	                       part = r.partition('=')
-	                      #print part[0] + " : " + part[2]
+	# Base64 Padding
+	npad = 4 - (len(idts) % 4)
+	pad = ""
+	for i in range(0, npad) :
+		pad = pad + "="
 
-	                       if part[0] == 'access_token' :
-	                                access_token = part[2]
-	                       elif (part[0] == 'expires') :
-	                                exp = part[2]
+	azp = ""
+	# Base64 Decode	
+	try :
+		dec_idtoken = base64.b64decode(idts+pad)
+		idtoken = json.loads(dec_idtoken)
+		#print idtoken
 
-				#2013-09-07 14:05:33.767074
-#	               expire = "2014-06-01T00:00:00z" 
+		nonce = idtoken['nonce']
+		iss = idtoken['iss']
+		exp = idtoken['exp']
+		sub = idtoken['sub']
+		aud = idtoken['aud']
 
-		exp = int(exp)
-		exp = timedelta(0,exp,0)
-		exp = nw + exp
-		exp = str(exp)
-		exps = exp.partition(' ')
-		time = exps[2].partition('.')
-		expire = exps[0]+'T'+time[0]+'z'
+		if idtoken.get('azp') :
+			azp = idtoken['azp']
 
-#		print expire
+		#print "iss:"+ idtoken['iss']
+		#print "sub:"+ idtoken['sub']
+		#print "aud:"+ idtoken['aud']
+		#print "exp:"+ idtoken['exp']
+		#print "iat:"+ idtoken['iat']
 
-#	        session = ris.oauthSrv.get_auth_session(data = {'code': data["code"], 'redirect_uri': ris.redirecturi})
-		session = ris.oauthSrv.get_session(access_token)
-		resp = session.get(ris.idservice).json()
-#		print resp
-		#hardcoded - MUDAR
-		name = ris.name_field
+	except :
+		print "OpenID Connect id token decoding error."
+                return name, expire, issuers
 
-	        for att, value in resp.iteritems():
-#			print att, value
-			if isinstance(value, list):
-				try :
-					atts[att] += value
-				except :
-					atts[att] = value
+	# Validate nonce
+	if ris.nonce != nonce:
+		print "Invalid nonce"
+		return name, expire, issuers
+		
+	# Format expiration date
 
-			elif isinstance(value, unicode) :
-				try : 
-					atts[att].append(value)
-				except :
-					atts[att] = [value]
-			else :
-				v = unicode(value)
-				try : 
-					atts[att].append(v)
-				except :
-					atts[att] = [v]
-#		print atts
+	exp = int(exp)
+	exp = datetime.fromtimestamp(exp)
+	exp = str(exp)
+	exps = exp.partition(' ')
+	timee = exps[2].partition('.')
+	expire = exps[0]+'T'+timee[0]+'z'
+#	print expire
 
-		issuers = self.check_issuers(data, atts, realm_id)
+	# Validate Issuer
+	# If last characters of issuer is /, remove it. (failed to check GidLab IdP due missing port :8080)
+	if iss[-1] == '/':
+		iss = iss[:-1]
+	if ris.endpoint_int.find(iss) == -1:
+                print "Invalid OpenID Connect issuer: "+iss
+                return name, expire, issuers
+
+	# Validate Client_ID
+	# Check if AUD is a list, and if so, check if client is an element (GidLab IdP)
+	if isinstance(aud, list):
+		if not any(ris.clientid == s for s in aud) :
+	                print "Invalid OpenID Connect audience: "+','.join(aud)
+	                return name, expire, issuers
+	elif aud != ris.clientid:
+                print "Invalid OpenID Connect audience: "+aud
+                return name, expire, issuers
+
+	# Validate AuthoriZed Party
+	if azp != "" and azp != ris.clientid:
+                print "Invalid OpenID Connect authorized party: "+azp
+                return name, expire, issuers
+
+	# Get User Info
+
+	idservice = "userinfo"
+	session   = ris.oauthSrv.get_session(access_token)
+	resp      = session.get(idservice).json()
+#	print resp
+
+	atts      = {}
+	for att, value in resp.iteritems():
+		if isinstance(value, list):
+			try :
+				atts[att] += value
+			except :
+				atts[att] = value
+# 			print "att: "+att+" value: "+','.join(value)
+
+		elif isinstance(value, unicode) :
+			try : 
+				atts[att].append(value)
+			except :
+				atts[att] = [value]
+ #			print "att: "+att+" value: "+value
+		else :
+			v = unicode(value)
+			try : 
+				atts[att].append(v)
+			except :
+				atts[att] = [v]
+# 			print "att: "+att+" value: "+v
+#	print atts
+
+	# Validate sub
+
+#	print sub, atts['sub'][0]	
+	if sub != atts['sub'][0] :
+                print "OpenID Connect user mismatch: "+sub+", "+atts['sub'][0]
+                return name, expire, issuers
+
+	# Check valid attributes (registered on mysql tables)
+
+	issuers = self.check_issuers(data, atts, realm_id)
 
 #	print "name   : ",name
 #	print "expire : ",expire
 #	print "issuers: ",issuers
 
-#######
-#name   :  _3409b1498beb31e0194afe984c61fda80de968c6e7
-#expires:  2013-07-08T03:22:36Z
-#issuers:  {'eduPersonPrincipalName': ['studentstudent@idp.ect.ufrn.br'], 'brEduAffiliationType': ['student']}	
-#######
-
         return name, expire, issuers 
 
     def check_issuers(self, data, atts, realm_id):
-#	print ("check_issuers")
         context = {"is_admin": True}
         valid_atts = {}
 	i = 1
         for att in atts:
-#	   print("Att: "+att)
            for val in atts[att]:
-#	       uv = unicode(val)
-#	       print("Val: "+uv)
                org_atts = self.org_mapping_api.list_org_attributes(context)['org_attributes']
                for org_att in org_atts:
-#		   print ("OrgType: "+org_att['type'])
-#		   if org_att['value'] is not None : 
-#			   print ("OrgVal : "+org_att['value'])
-#		   else :
-#			   print ("OrgVal : None")
                    if org_att['type'] == att:
-#		       print("OrgType == att")
                        if org_att['value'] == val or org_att['value'] is None:
-#			   print("OrgVal == val, or none")
                            try:
                                self.org_mapping_api.check_attribute_can_be_issued(context, service_id=realm_id, org_attribute_id=org_att['id'])
                                try:
